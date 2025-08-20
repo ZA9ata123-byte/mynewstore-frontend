@@ -3,38 +3,33 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\Category;
 use App\Models\Product;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Validator;
 
 class ProductController extends Controller
 {
     /**
-     * Display a listing of all products.
+     * Store a newly created product in storage.
      */
-    public function index()
+    public function store(Request $request)
     {
-        // We use 'with' to load the relationships efficiently to avoid N+1 problem
-        return Product::with(['category', 'variants'])->get();
-    }
+        $validator = Validator::make($request->all(), [
+            'name' => 'required|string|max:255',
+            'price' => 'required|numeric|min:0',
+            'description' => 'nullable|string',
+            'stock' => 'required|integer|min:0',
+        ]);
 
-    /**
-     * Display the specified product.
-     */
-    public function show(Product $product)
-    {
-        // Laravel's Route Model Binding finds the product for us.
-        // We just need to load its relationships.
-        return $product->load(['variants', 'images', 'category']);
-    }
+        if ($validator->fails()) {
+            return response()->json($validator->errors(), 422);
+        }
 
-    /**
-     * Display a listing of products that belong to a specific category.
-     */
-    public function productsByCategory(Category $category)
-    {
-        // Laravel finds the category by its slug.
-        // Then we get all products related to it.
-        return $category->products()->with(['variants'])->get();
+        $product = Product::create($request->all());
+
+        return response()->json([
+            'message' => 'Product created successfully!',
+            'product' => $product
+        ], 201);
     }
 }

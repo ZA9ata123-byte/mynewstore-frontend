@@ -2,8 +2,7 @@
 
 namespace Database\Seeders;
 
-use App\Models\Category;
-use App\Models\Product;
+use App\Models\User;
 use Illuminate\Database\Seeder;
 
 class DatabaseSeeder extends Seeder
@@ -13,25 +12,24 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // Let's create two categories
-        $category1 = Category::create(['name' => 'كتب', 'slug' => 'kotob']);
-        $category2 = Category::create(['name' => 'إلكترونيات', 'slug' => 'electroniyat']);
+        // First, run the seeder for roles and permissions
+        $this->call(RolesAndPermissionsSeeder::class);
 
-        // Create a product in the 'كتب' category
-        $product1 = Product::create([
-            'category_id' => $category1->id,
-            'name' => 'أساسيات الشطرنج للمبتدئين',
-            'description' => 'كتاب رائع لتعلم لعبة الشطرنج من الصفر وبناء أساس قوي.',
-            'image_url' => 'https://i.ibb.co/WpBPbrGN/296352289-352577747070597-7492146128612563083-n.jpg'
+        // Create a specific admin user
+        $admin = User::factory()->create([
+            'name' => 'Admin',
+            'email' => 'admin@example.com',
+            'password' => bcrypt('password'),
+            'is_admin' => true, // We can remove this later
         ]);
 
-        // Add a variant (price, stock) to the product
-        $product1->variants()->create([
-            'price' => '120.00',
-            'stock_quantity' => 50,
-            'attributes' => []
+        // Assign the super-admin role to the admin user
+        $admin->assignRole('super-admin');
+
+        // Then, run the other seeders
+        $this->call([
+            CategorySeeder::class,
+            ProductSeeder::class,
         ]);
-        
-        // You can add more products here if you want
     }
 }

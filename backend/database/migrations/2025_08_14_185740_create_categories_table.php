@@ -11,11 +11,10 @@ return new class extends Migration
      */
     public function up(): void
     {
-        // This is the important part that defines the table's columns
         Schema::create('categories', function (Blueprint $table) {
             $table->id();
             $table->string('name');
-            $table->string('slug')->unique(); // The slug must be unique
+            $table->text('description')->nullable(); // <-- ها هو السطر اللي زدنا
             $table->timestamps();
         });
     }

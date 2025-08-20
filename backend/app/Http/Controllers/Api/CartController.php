@@ -3,50 +3,92 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\Cart;
-use App\Models\ProductVariant;
 use Illuminate\Http\Request;
+use App\Models\Product;
+use App\Models\Cart;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
 
 class CartController extends Controller
 {
-    /**
-     * Add an item to the cart.
-     */
-    public function store(Request $request)
+    private function getOrCreateCart(Request $request)
+    {
+        $guestToken = $request->header('X-Cart-Token');
+        $user = Auth::guard('sanctum')->user();
+
+        // If user is logged in
+        if ($user) {
+            // Find or create a cart for the logged-in user
+            $userCart = Cart::firstOrCreate(
+                ['user_id' => $user->id]
+            );
+
+            // If a guest cart token is also present, we need to merge
+            if ($guestToken) {
+                $guestCart = Cart::where('token', $guestToken)->whereNull('user_id')->first();
+
+                if ($guestCart && $guestCart->id !== $userCart->id) {
+                    // Move items from guest cart to user cart
+                    foreach ($guestCart->items as $guestItem) {
+                        $existingItem = $userCart->items()->where('product_id', $guestItem->product_id)->first();
+
+                        if ($existingItem) {
+                            // If item already exists, just update quantity
+                            $existingItem->quantity += $guestItem->quantity;
+                            $existingItem->save();
+                        } else {
+                            // If not, move the item by changing its cart_id
+                            $guestItem->cart_id = $userCart->id;
+                            $guestItem->save();
+                        }
+                    }
+                    // After moving all items, the user cart must be reloaded
+                    $userCart->load('items');
+                    // Delete the now-empty guest cart
+                    $guestCart->delete();
+                }
+            }
+            return $userCart;
+        }
+
+        // If user is a guest
+        if ($guestToken) {
+            return Cart::firstOrCreate(['token' => $guestToken]);
+        }
+
+        // If no token, create a brand new guest cart
+        return Cart::create(['token' => Str::random(40)]);
+    }
+
+
+    public function addToCart(Request $request)
     {
         $request->validate([
-            'variant_id' => 'required|exists:product_variants,id',
+            'product_id' => 'required|exists:products,id',
             'quantity' => 'required|integer|min:1',
         ]);
 
-        // For now, we'll use a session ID to manage the cart.
-        // Later, we can link this to the logged-in user.
-        $sessionId = $request->session()->getId();
-        if (!$sessionId) {
-            $sessionId = Str::uuid()->toString();
-            $request->session()->put('cart_session_id', $sessionId);
-        }
+        $cart = $this->getOrCreateCart($request);
+        $product = Product::findOrFail($request->product_id);
+        $quantity = $request->input('quantity', 1);
 
-        $cart = Cart::firstOrCreate(['session_id' => $sessionId]);
-        $variant = ProductVariant::find($request->variant_id);
-
-        // Check if this variant is already in the cart
-        $cartItem = $cart->items()->where('product_variant_id', $request->variant_id)->first();
+        $cartItem = $cart->items()->where('product_id', $product->id)->first();
 
         if ($cartItem) {
-            // If it exists, just update the quantity
-            $cartItem->quantity += $request->quantity;
+            $cartItem->quantity += $quantity;
             $cartItem->save();
         } else {
-            // If it's new, create a new cart item
             $cart->items()->create([
-                'product_id' => $variant->product_id,
-                'product_variant_id' => $request->variant_id,
-                'quantity' => $request->quantity,
+                'product_id' => $product->id,
+                'quantity' => $quantity,
             ]);
         }
 
-        return response()->json(['message' => 'Product added to cart successfully!']);
+        $user = Auth::guard('sanctum')->user();
+        return response()->json([
+            'message' => 'Product added to cart successfully!',
+            'cart_token' => $user ? null : $cart->token,
+            'cart' => $cart->load('items.product')
+        ], 200);
     }
 }
