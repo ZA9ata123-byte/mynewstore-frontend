@@ -38,7 +38,49 @@ class AuthController extends Controller
         ], 201);
     }
 
-    // 5. الدالة ديال تسجيل دخول الأدمن
+    // --- هادي هي الإضافة الأولى ---
+    /**
+     * Login for regular users.
+     */
+    public function login(Request $request)
+    {
+        $request->validate([
+            'email' => 'required|email',
+            'password' => 'required',
+        ]);
+
+        $user = User::where('email', $request->email)->first();
+
+        if (!$user || !Hash::check($request->password, $user->password)) {
+            return response()->json(['message' => 'Invalid login details'], 401);
+        }
+
+        // كنمحو أي توكن قديم عند المستخدم باش نضمنو عندو جلسة (session) وحدة مفتوحة
+        $user->tokens()->delete();
+
+        // كنصاوبو ليه توكن جديد
+        $token = $user->createToken('auth_token')->plainTextToken;
+
+        return response()->json([
+            'access_token' => $token,
+            'token_type' => 'Bearer',
+            'user' => $user,
+        ]);
+    }
+
+    // --- هادي هي الإضافة الثانية ---
+    /**
+     * Logout user (Revoke the token).
+     */
+    public function logout(Request $request)
+    {
+        $request->user()->currentAccessToken()->delete();
+
+        return response()->json(['message' => 'Logged out successfully']);
+    }
+
+
+    // 5. الدالة ديال تسجيل دخول الأدمن (بقات كيفما هي)
     public function adminLogin(Request $request)
     {
         $request->validate([
@@ -46,25 +88,19 @@ class AuthController extends Controller
             'password' => 'required|string',
         ]);
 
-        // كنحاولو ندخلو المستخدم بالبيانات ديالو
         if (!Auth::attempt($request->only('email', 'password'))) {
             return response()->json(['message' => 'Invalid login details'], 401);
         }
 
-        // إلى دخَل، كنجيبو المعلومات ديالو
         $user = Auth::user();
 
-        // أهم سطر: كنتأكدو واش هو أدمن
         if (!$user->is_admin) {
-            // إلى ماشي أدمن، كنمحو ليه التوكن ونقولو ليه ممنوع الدخول
             $user->tokens()->delete();
             return response()->json(['message' => 'Forbidden: You are not an admin.'], 403);
         }
 
-        // إلى كان أدمن، كنصاوبو ليه توكن خاص بالأدمن
         $token = $user->createToken('admin_auth_token')->plainTextToken;
 
-        // كنرجعو ليه الجواب بالنجاح
         return response()->json([
             'message' => 'Admin successfully logged in',
             'user' => $user,

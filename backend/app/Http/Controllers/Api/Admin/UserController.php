@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\Api\Admin; // <-- هنا فين كان الخطأ وتصحح
+namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
@@ -64,6 +64,26 @@ class UserController extends Controller
 
         return response()->json($user);
     }
+
+    // --- هادي هي الإضافة ---
+    /**
+     * Assign a role to a user.
+     */
+    public function assignRole(Request $request, User $user)
+    {
+        $request->validate([
+            'role' => 'required|string|exists:roles,name' // كنتأكدو أن الدور المطلوب كاين ف قاعدة البيانات
+        ]);
+
+        // هاد الدالة السحرية كتمسح أي دور قديم وكتعطي الدور الجديد للمستخدم
+        $user->syncRoles($request->role);
+
+        return response()->json([
+            'message' => "Role '{$request->role}' assigned successfully to {$user->name}.",
+            'user' => $user->load('roles') // كنرجعو المستخدم مع الدور الجديد ديالو باش نتأكدو
+        ]);
+    }
+
 
     /**
      * Remove the specified resource from storage.
