@@ -1,0 +1,9 @@
+# This is the configuration file for Dependabot version updates
+
+version: 2
+updates:
+  # This section is for your Front-end project (JavaScript)
+  - package-ecosystem: "npm"    # Tell Dependabot this is a Node.js / npm project
+    directory: "/"              # Tell Dependabot to look for the package.json file in the main folder
+    schedule:
+      interval: "weekly"          # Check for new versions once a week (you can change it to "daily" or "monthly")
