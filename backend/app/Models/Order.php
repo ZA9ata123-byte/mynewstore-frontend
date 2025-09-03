@@ -9,27 +9,35 @@ class Order extends Model
 {
     use HasFactory;
 
+    /**
+     * The attributes that are mass assignable.
+     *
+     * @var array
+     */
+    // --- هنا التصحيح: تأكد من أن كل هذه الحقول موجودة ---
     protected $fillable = [
         'user_id',
-        'total_amount',
         'status',
-        'shipping_address',
-        'billing_address',
+        'total_price',    // تأكد من وجود هذا السطر
+        'shipping_info',  // وهذا أيضاً
     ];
 
     /**
-     * Get the user that owns the order.
+     * The attributes that should be cast.
+     *
+     * @var array
      */
-    public function user()
-    {
-        return $this->belongsTo(User::class);
-    }
+    protected $casts = [
+        'shipping_info' => 'array',
+    ];
 
-    /**
-     * Get the items for the order.
-     */
     public function items()
     {
         return $this->hasMany(OrderItem::class);
+    }
+
+    public function user()
+    {
+        return $this->belongsTo(User::class);
     }
 }

@@ -5,24 +5,35 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Category;
 use Illuminate\Http\Request;
-use Illuminate\Support\Str;
 
 class CategoryController extends Controller
 {
-    // هادي كتجيب لينا كاع الأقسام
+    /**
+     * Display a listing of all categories for the storefront.
+     *
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function index()
     {
-        return Category::latest()->get();
+        // Fetch all categories without pagination for the storefront
+        $categories = Category::all();
+        return response()->json(['data' => $categories]);
     }
 
-    // هادي كتزيد قسم جديد (للمدير فقط)
-    public function store(Request $request)
+    /**
+     * Display a single category along with its products.
+     *
+     * @param  \App\Models\Category  $category
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function show(Category $category)
     {
-        $request->validate(['name' => 'required|string|max:255|unique:categories']);
-        $category = Category::create([
-            'name' => $request->name,
-            'slug' => Str::slug($request->name),
+        // Load the category with its products, paginated
+        $products = $category->products()->paginate(12);
+        
+        return response()->json([
+            'category' => $category,
+            'products' => $products,
         ]);
-        return response()->json($category, 201);
     }
 }

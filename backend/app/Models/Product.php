@@ -4,55 +4,75 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-
-/**
- * @property int $id
- * @property int $category_id
- * @property string $name
- * @property string $description
- * @property string $price
- * @property int $stock_quantity
- * @property string|null $image_url
- * @property \Illuminate\Support\Carbon|null $created_at
- * @property \Illuminate\Support\Carbon|null $updated_at
- * @method static \Illuminate\Database\Eloquent\Builder<static>|Product newModelQuery()
- * @method static \Illuminate\Database\Eloquent\Builder<static>|Product newQuery()
- * @method static \Illuminate\Database\Eloquent\Builder<static>|Product query()
- * @method static \Illuminate\Database\Eloquent\Builder<static>|Product whereCategoryId($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|Product whereCreatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|Product whereDescription($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|Product whereId($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|Product whereImageUrl($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|Product whereName($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|Product wherePrice($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|Product whereStockQuantity($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|Product whereUpdatedAt($value)
- * @mixin \Eloquent
- */
+use Illuminate\Database\Eloquent\Casts\Attribute;
 
 class Product extends Model
 {
     use HasFactory;
 
-    /**
-     * The attributes that are mass assignable.
-     *
-     * @var array<int, string>
-     */
     protected $fillable = [
-        'name',
-        'description',
-        'price',
-        'stock_quantity',
-        'category_id',
-        'image_url',
+        'category_id', 'name', 'slug', 'description', 'short_description', 
+        'price', 'product_type', 'stock',
     ];
 
-    /**
-     * Get the category that owns the product.
-     */
-    public function category()
+    // --- هنا تمت إضافة الذكاء ---
+    protected $appends = ['total_stock', 'price_range'];
+
+    protected function totalStock(): Attribute
     {
-        return $this->belongsTo(Category::class);
+        return Attribute::make(
+            get: function () {
+                if ($this->product_type === 'simple') {
+                    return $this->stock;
+                }
+                return $this->variants()->sum('stock');
+            }
+        );
+    }
+
+    /**
+     * --- هادي هي الدالة السحرية الجديدة لي كتحسب لينا مجال السعر ---
+     */
+    protected function priceRange(): Attribute
+    {
+        return Attribute::make(
+            get: function () {
+                // إذا كان المنتج بسيط، رجع السعر العادي
+                if ($this->product_type === 'simple') {
+                    return "{$this->price} د.م.";
+                }
+
+                // إذا كان المنتج متغير، احسب أصغر وأكبر سعر
+                $minPrice = $this->variants()->min('price');
+                $maxPrice = $this->variants()->max('price');
+
+                if ($minPrice && $maxPrice) {
+                    if ($minPrice == $maxPrice) {
+                        return "{$minPrice} د.م.";
+                    }
+                    return "{$minPrice} - {$maxPrice} د.م.";
+                }
+
+                // في حالة عدم وجود متغيرات، رجع السعر الأساسي
+                return "{$this->price} د.م.";
+            }
+        );
+    }
+
+    // --- العلاقات ---
+    public function category() { return $this->belongsTo(Category::class); }
+    public function images() { return $this->hasMany(ProductImage::class); }
+    public function options() { return $this->hasMany(ProductOption::class); }
+    public function variants() { return $this->hasMany(ProductVariant::class); }
+
+    /**
+     * --- هادي هي الدالة الجديدة اللي زدنا ---
+     * Check if the product is of variable type.
+     *
+     * @return bool
+     */
+    public function isVariable(): bool
+    {
+        return $this->product_type === 'variable';
     }
 }

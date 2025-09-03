@@ -3,77 +3,77 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
-use App\Models\Cart;
 use App\Models\Order;
+use App\Models\User;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Validator; // <-- إضافة مهمة للتحقق اليدوي
+use Illuminate\Support\Str;
 
 class CheckoutController extends Controller
 {
     public function placeOrder(Request $request)
     {
-        $user = Auth::user();
-        $guestToken = $request->header('X-Cart-Token');
+        // --- التصحيح 1: التحقق من صحة البيانات (Validation) أصبح أكثر دقة ---
+        $validator = Validator::make($request->all(), [
+            'shipping_info.name' => 'required|string|max:255',
+            'shipping_info.email' => 'required|email|max:255',
+            'shipping_info.address' => 'required|string|max:255',
+            'shipping_info.city' => 'required|string|max:255',
+            'shipping_info.phone' => 'required|string|max:20',
+            'items' => 'required|array|min:1',
+            'items.*.product_id' => 'required|exists:products,id',
+            'items.*.quantity' => 'required|integer|min:1',
+            'items.*.price' => 'required|numeric|min:0',
+            'total_price' => 'required|numeric|min:0',
+            'create_account' => 'boolean',
+            // كلمة المرور مطلوبة فقط إذا كان خيار إنشاء حساب محدداً
+            'password' => 'required_if:create_account,true|nullable|string|min:8',
+        ]);
 
-        // --- START: The Magic Merge Logic ---
-        $userCart = Cart::firstOrCreate(['user_id' => $user->id]);
+        if ($validator->fails()) {
+            return response()->json(['message' => 'البيانات المدخلة غير صالحة', 'errors' => $validator->errors()], 422);
+        }
 
-        if ($guestToken) {
-            $guestCart = Cart::where('token', $guestToken)->whereNull('user_id')->first();
-            if ($guestCart) {
-                foreach ($guestCart->items as $guestItem) {
-                    $existingItem = $userCart->items()->where('product_id', $guestItem->product_id)->first();
-                    if ($existingItem) {
-                        $existingItem->quantity += $guestItem->quantity;
-                        $existingItem->save();
-                    } else {
-                        $guestItem->cart_id = $userCart->id;
-                        $guestItem->save();
-                    }
+        $validatedData = $validator->validated();
+
+        return DB::transaction(function () use ($validatedData, $request) {
+            // --- التصحيح 2: التعامل مع المستخدم بشكل آمن ---
+            $user = auth('sanctum')->user(); // نحاول الحصول على المستخدم المسجل دخوله
+            $shippingInfo = $validatedData['shipping_info'];
+
+            if (!$user && $request->create_account) {
+                if (User::where('email', $shippingInfo['email'])->exists()) {
+                    return response()->json(['message' => 'هذا البريد الإلكتروني مستخدم بالفعل.'], 422);
                 }
-                $userCart->load('items');
-                $guestCart->delete();
+                $user = User::create([
+                    'name' => $shippingInfo['name'],
+                    'email' => $shippingInfo['email'],
+                    'password' => Hash::make($validatedData['password']),
+                ]);
             }
-        }
-        // --- END: The Magic Merge Logic ---
 
-        $cart = $userCart; // Now we are sure we have the correct merged cart
-
-        if ($cart->items->isEmpty()) {
-            return response()->json(['message' => 'Your cart is empty.'], 400);
-        }
-
-        $request->validate([
-            'shipping_address' => 'required|string|max:255',
-            'billing_address' => 'required|string|max:255',
-        ]);
-
-        $totalAmount = $cart->items->sum(function ($item) {
-            return $item->quantity * $item->product->price;
-        });
-
-        $order = Order::create([
-            'user_id' => $user->id,
-            'total_amount' => $totalAmount,
-            'status' => 'pending',
-            'shipping_address' => $request->shipping_address,
-            'billing_address' => $request->billing_address,
-        ]);
-
-        foreach ($cart->items as $item) {
-            $order->items()->create([
-                'product_id' => $item->product_id,
-                'quantity' => $item->quantity,
-                'price' => $item->product->price,
+            $order = Order::create([
+                'user_id' => $user ? $user->id : null, // نربط الطلب بالمستخدم إذا كان موجوداً
+                'status' => 'pending',
+                'total_price' => $validatedData['total_price'],
+                'shipping_info' => json_encode($shippingInfo),
             ]);
-        }
 
-        $cart->delete();
+            foreach ($validatedData['items'] as $item) {
+                $order->items()->create([
+                    'product_id' => $item['product_id'],
+                    'quantity' => $item['quantity'],
+                    'price' => $item['price'],
+                ]);
+            }
 
-        return response()->json([
-            'message' => 'Order placed successfully!',
-            'order' => $order->load('items.product')
-        ], 201);
+            return response()->json([
+                'message' => 'تم استلام طلبك بنجاح!',
+                'order' => $order->load('items'),
+            ], 201);
+        });
     }
 }

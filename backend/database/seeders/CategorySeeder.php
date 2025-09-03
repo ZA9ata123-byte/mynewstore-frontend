@@ -2,9 +2,8 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
-use App\Models\Category; // <-- مهم نستدعيو الموديل
+use App\Models\Category;
 
 class CategorySeeder extends Seeder
 {
@@ -13,14 +12,9 @@ class CategorySeeder extends Seeder
      */
     public function run(): void
     {
-        Category::create([
-            'name' => 'كتب',
-            'description' => 'قسم خاص بالكتب التعليمية والثقافية.'
-        ]);
-
-        Category::create([
-            'name' => 'إلكترونيات',
-            'description' => 'قسم خاص بالأجهزة الإلكترونية.'
-        ]);
+        // --- هنا تم الإصلاح: تم حذف حقل الوصف ---
+        Category::create(['name' => 'كتب', 'slug' => 'books']);
+        Category::create(['name' => 'ملابس', 'slug' => 'apparel']);
+        Category::create(['name' => 'إلكترونيات', 'slug' => 'electronics']);
     }
 }

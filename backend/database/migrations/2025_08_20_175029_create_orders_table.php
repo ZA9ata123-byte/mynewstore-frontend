@@ -13,11 +13,17 @@ return new class extends Migration
     {
         Schema::create('orders', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('user_id')->constrained()->onDelete('cascade');
-            $table->decimal('total_amount', 10, 2);
-            $table->string('status')->default('pending'); // (pending, processing, shipped, delivered, cancelled)
-            $table->string('shipping_address');
-            $table->string('billing_address');
+            // --- التصحيح 1: جعل user_id اختيارياً (nullable) لقبول طلبات الزوار ---
+            $table->foreignId('user_id')->nullable()->constrained()->onDelete('set null');
+            
+            // --- تم تغيير الاسم من total_amount إلى total_price ليتوافق مع الكود ---
+            $table->decimal('total_price', 10, 2);
+            
+            $table->string('status')->default('pending');
+            
+            // --- التصحيح 2: دمج كل معلومات الشحن في حقل JSON واحد ---
+            $table->json('shipping_info');
+            
             $table->timestamps();
         });
     }

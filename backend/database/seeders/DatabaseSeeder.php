@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Models\User;
 use Illuminate\Database\Seeder;
+use Spatie\Permission\Models\Role;
 
 class DatabaseSeeder extends Seeder
 {
@@ -12,24 +13,30 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // First, run the seeder for roles and permissions
+        // 1. استدعاء ملف الصلاحيات أولاً لإنشاء الأدوار (admin, user)
         $this->call(RolesAndPermissionsSeeder::class);
 
-        // Create a specific admin user
-        $admin = User::factory()->create([
-            'name' => 'Admin',
+        // --- هنا تمت الإضافة والتصحيح ---
+        $guardName = 'api';
+
+        // 2. إنشاء مستخدم أدمن بالمعلومات الصحيحة
+        User::factory()->create([
+            'name' => 'Admin User',
             'email' => 'admin@example.com',
-            'password' => bcrypt('password'),
-            'is_admin' => true, // We can remove this later
-        ]);
+            'password' => bcrypt('password'), // كلمة المرور هي 'password'
+            'is_admin' => true,
+        ])->assignRole(Role::findByName('admin', $guardName));
 
-        // Assign the super-admin role to the admin user
-        $admin->assignRole('super-admin');
+        // 3. (اختياري) إنشاء مستخدم عادي للاختبارات
+        User::factory()->create([
+            'name' => 'Test User',
+            'email' => 'test@example.com',
+            'password' => bcrypt('password'), // كلمة المرور هي 'password'
+        ])->assignRole(Role::findByName('user', $guardName));
 
-        // Then, run the other seeders
-        $this->call([
-            CategorySeeder::class,
-            ProductSeeder::class,
-        ]);
+
+        // 4. استدعاء باقي الملفات لتعمير قاعدة البيانات
+        $this->call(CategorySeeder::class);
+        $this->call(ProductSeeder::class);
     }
 }

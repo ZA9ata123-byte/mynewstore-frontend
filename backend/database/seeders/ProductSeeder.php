@@ -2,33 +2,56 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
-use App\Models\Product; // <-- مهم نستدعيو الموديل
+use App\Models\Product;
+use App\Models\Category;
 
 class ProductSeeder extends Seeder
 {
-    /**
-     * Run the database seeds.
-     */
     public function run(): void
     {
-        Product::create([
-            'category_id' => 1,
-            'name' => 'أساسيات الشطرنج للمبتدئين',
-            'description' => 'كتاب رائع لتعلم لعبة الشطرنج من الصفر وبناء أساس قوي.',
-            'price' => 120.00,
-            'stock_quantity' => 50,
-            'image_url' => 'https://i.ibb.co/WpBPbrGN/296352289-352577747070597-7492146128612563083-n.jpg',
-        ]);
+        $category = Category::where('slug', 'apparel')->first();
+        if (!$category) {
+            $category = Category::create(['name' => 'ملابس', 'slug' => 'apparel']);
+        }
 
+        // --- المنتج الأول: بسيط ---
         Product::create([
-            'category_id' => 1,
-            'name' => 'فن الحرب',
+            'category_id' => $category->id,
+            'name' => 'كتاب فن الحرب',
+            'slug' => 'the-art-of-war',
+            'short_description' => 'كتاب استراتيجي قديم لا يزال يدرس.',
             'description' => 'كتاب استراتيجي قديم لا يزال يدرس في الكليات العسكرية حول العالم.',
             'price' => 95.50,
-            'stock_quantity' => 30,
-            'image_url' => 'https://i.ibb.co/bX11L2S/3215.jpg',
+            'product_type' => 'simple',
+            'stock' => 30,
         ]);
+
+        // --- المنتج الثاني: متغير (تيشيرت) ---
+        $tshirt = Product::create([
+            'category_id' => $category->id,
+            'name' => 'تيشيرت مبرمج محترف',
+            'slug' => 'pro-coder-tshirt',
+            'short_description' => 'أفضل تيشيرت للمبرمجين، قطن عالي الجودة.',
+            'description' => 'أفضل تيشيرت للمبرمجين المحترفين. قطن عالي الجودة.',
+            'price' => 150.00,
+            'product_type' => 'variable',
+            'stock' => 0,
+        ]);
+
+        // إنشاء الخيارات والقيم للمنتج الثاني
+        $sizeOption = $tshirt->options()->create(['name' => 'القياس']);
+        $sizeM = $sizeOption->values()->create(['value' => 'M']);
+        $sizeL = $sizeOption->values()->create(['value' => 'L']);
+
+        $colorOption = $tshirt->options()->create(['name' => 'اللون']);
+        $colorRed = $colorOption->values()->create(['value' => 'أحمر']);
+        
+        // إنشاء المتغيرات وربطها بالقيم
+        $variant1 = $tshirt->variants()->create(['price' => 150, 'stock' => 20, 'sku' => 'TS-M-RED']);
+        $variant1->optionValues()->attach([$sizeM->id, $colorRed->id]);
+
+        $variant2 = $tshirt->variants()->create(['price' => 160, 'stock' => 10, 'sku' => 'TS-L-RED']);
+        $variant2->optionValues()->attach([$sizeL->id, $colorRed->id]);
     }
 }

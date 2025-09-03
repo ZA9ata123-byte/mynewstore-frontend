@@ -9,20 +9,19 @@ use Illuminate\Http\Request;
 class ProductController extends Controller
 {
     /**
-     * Display a listing of the resource for public access.
+     * --- هنا قمنا بالتعديل ---
+     * أضفنا withCount('variants') لإرجاع عدد المتغيرات مع كل منتج
      */
     public function index()
     {
-        // هادي كترجع لائحة المنتجات كاملة، مرتبة من الجديد للقديم
-        return Product::latest()->get();
+        return Product::withCount('variants')->latest()->get();
     }
 
     /**
-     * Display the specified resource for public access.
+     * عرض منتج واحد محدد للعموم.
      */
     public function show(Product $product)
     {
-        // هادي كترجع منتج واحد بالـ ID ديالو
-        return $product;
+        return $product->load('variants');
     }
 }

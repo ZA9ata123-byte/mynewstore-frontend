@@ -13,9 +13,7 @@ return new class extends Migration
             $table->foreignId('product_id')->constrained()->onDelete('cascade');
             $table->string('sku')->unique()->nullable();
             $table->decimal('price', 10, 2);
-            $table->unsignedInteger('stock_quantity')->default(0);
-            $table->json('attributes')->nullable();
-            $table->string('image_url')->nullable();
+            $table->integer('stock')->default(0); // <-- تمت الإضافة هنا
             $table->timestamps();
         });
     }

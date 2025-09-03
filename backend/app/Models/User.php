@@ -2,17 +2,14 @@
 
 namespace App\Models;
 
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
-use Spatie\Permission\Traits\HasRoles; // <--- السطر الأول الجديد: استدعاء الخاصية
 
 class User extends Authenticatable
 {
-    // السطر الثاني الجديد: استعمال الخاصية HasRoles مع الآخرين
-    use HasApiTokens, HasFactory, Notifiable, HasRoles; 
+    use HasApiTokens, HasFactory, Notifiable;
 
     /**
      * The attributes that are mass assignable.
@@ -23,7 +20,7 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
-        'is_admin',
+        'is_admin'
     ];
 
     /**
@@ -37,16 +34,34 @@ class User extends Authenticatable
     ];
 
     /**
-     * Get the attributes that should be cast.
+     * The attributes that should be cast.
      *
-     * @return array<string, string>
+     * @var array<string, string>
      */
-    protected function casts(): array
+    protected $casts = [
+        'email_verified_at' => 'datetime',
+        'password' => 'hashed',
+        'is_admin' => 'boolean',
+    ];
+
+    /**
+     * Get the cart associated with the user.
+     */
+    public function cart()
     {
-        return [
-            'email_verified_at' => 'datetime',
-            'password' => 'hashed',
-            'is_admin' => 'boolean',
-        ];
+        return $this->hasOne(Cart::class);
+    }
+
+    /**
+     * ✅ هذه هي الدالة الذكية الجديدة
+     * Check if the user owns the given cart item.
+     *
+     * @param CartItem $cartItem
+     * @return bool
+     */
+    public function ownsCartItem(CartItem $cartItem): bool
+    {
+        // A user owns the cart item if the item's cart belongs to them.
+        return $this->id === $cartItem->cart->user_id;
     }
 }
