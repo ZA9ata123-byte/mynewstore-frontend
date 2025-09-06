@@ -15,6 +15,8 @@ use App\Http\Controllers\Api\OrderController as UserOrderController;
 use App\Http\Controllers\Api\Admin\CategoryController as AdminCategoryController;
 use App\Http\Controllers\Api\Admin\ProductController as AdminProductController;
 use App\Http\Controllers\Api\Admin\OrderController as AdminOrderController;
+// ✅ السطر الجديد لي زدنا باش نستعملو الكونترولر ديال الأدمن
+use App\Http\Controllers\Api\Admin\AuthController as AdminAuthController;
 
 /*
 |--------------------------------------------------------------------------
@@ -23,6 +25,10 @@ use App\Http\Controllers\Api\Admin\OrderController as AdminOrderController;
 */
 
 // --- Public Routes ---
+
+// ✅✅✅ هذا هو المسار الجديد والأساسي لي زدنا باش نحلوا المشكل ✅✅✅
+Route::post('/admin/login', [AdminAuthController::class, 'login']);
+
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
 

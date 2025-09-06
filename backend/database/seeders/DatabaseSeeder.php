@@ -4,7 +4,7 @@ namespace Database\Seeders;
 
 use App\Models\User;
 use Illuminate\Database\Seeder;
-use Spatie\Permission\Models\Role;
+use Illuminate\Support\Facades\Hash; // <-- زدنا هادي
 
 class DatabaseSeeder extends Seeder
 {
@@ -13,30 +13,29 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // 1. استدعاء ملف الصلاحيات أولاً لإنشاء الأدوار (admin, user)
-        $this->call(RolesAndPermissionsSeeder::class);
+        // --- هنا تمت إضافة المنطق الذكي لإنشاء الأدمن ---
 
-        // --- هنا تمت الإضافة والتصحيح ---
-        $guardName = 'api';
+        // 1. إنشاء مستخدم عادي (زبون)
+        User::factory()->create([
+            'name' => 'Test User',
+            'email' => 'user@example.com',
+            'password' => Hash::make('password'), // كلمة السر هي password
+            'is_admin' => false, // هذا مستخدم عادي
+        ]);
 
-        // 2. إنشاء مستخدم أدمن بالمعلومات الصحيحة
+        // 2. إنشاء حساب المدير (Admin)
         User::factory()->create([
             'name' => 'Admin User',
             'email' => 'admin@example.com',
-            'password' => bcrypt('password'), // كلمة المرور هي 'password'
-            'is_admin' => true,
-        ])->assignRole(Role::findByName('admin', $guardName));
-
-        // 3. (اختياري) إنشاء مستخدم عادي للاختبارات
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
-            'password' => bcrypt('password'), // كلمة المرور هي 'password'
-        ])->assignRole(Role::findByName('user', $guardName));
-
-
-        // 4. استدعاء باقي الملفات لتعمير قاعدة البيانات
-        $this->call(CategorySeeder::class);
-        $this->call(ProductSeeder::class);
+            'password' => Hash::make('password'), // كلمة السر هي password
+            'is_admin' => true, // هذا هو المدير!
+        ]);
+        
+        // 3. استدعاء باقي الـ Seeders
+        $this->call([
+            RolesAndPermissionsSeeder::class,
+            CategorySeeder::class,
+            ProductSeeder::class,
+        ]);
     }
 }

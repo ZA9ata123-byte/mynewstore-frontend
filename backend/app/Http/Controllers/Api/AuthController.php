@@ -3,8 +3,8 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Api\RegisterRequest; // ✅ استخدام الـ Request الجديد
-use App\Services\AuthService; // ✅ استخدام الـ Service الجديد
+use App\Http\Requests\Api\RegisterRequest;
+use App\Services\AuthService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 

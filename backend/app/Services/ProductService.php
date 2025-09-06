@@ -3,107 +3,104 @@
 namespace App\Services;
 
 use App\Models\Product;
-use Illuminate\Http\UploadedFile;
+use App\Models\ProductOption;
+use App\Models\ProductOptionValue;
+use App\Models\ProductVariant;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class ProductService
 {
     /**
-     * Create a new product with its images, options, and variants.
+     * إنشاء منتج جديد (بسيط أو متغير) مع الصور والخيارات والمتغيرات.
      *
-     * @param array $data The validated data from the request.
-     * @param array<UploadedFile> $images The uploaded image files.
+     * @param array $data
+     * @param array $images
      * @return Product
      */
     public function createProduct(array $data, array $images = []): Product
     {
+        // استخدام Transaction لضمان سلامة البيانات
         return DB::transaction(function () use ($data, $images) {
+
+            // 1. إنشاء المنتج الأساسي
             $product = Product::create([
                 'name' => $data['name'],
                 'slug' => Str::slug($data['name']),
                 'description' => $data['description'] ?? null,
                 'short_description' => $data['short_description'] ?? null,
-                'price' => $data['price'] ?? 0,
-                'stock' => $data['stock'] ?? 0,
                 'category_id' => $data['category_id'],
                 'product_type' => $data['product_type'],
+                // --- منطق ذكي للتعامل مع السعر والمخزون ---
+                'price' => $data['product_type'] === 'simple' ? $data['price'] : 0,
+                'stock' => $data['product_type'] === 'simple' ? $data['stock'] : 0,
             ]);
 
-            $this->handleImageUploads($product, $images);
-
-            if ($product->isVariable() && !empty($data['options']) && !empty($data['variants'])) {
-                $this->createOptionsAndVariants(
-                    $product,
-                    json_decode($data['options'], true),
-                    json_decode($data['variants'], true)
-                );
+            // 2. رفع الصور الأساسية للمنتج
+            if (!empty($images)) {
+                foreach ($images as $imageFile) {
+                    $path = $imageFile->store('products', 'public');
+                    $product->images()->create(['image_url' => $path]);
+                }
             }
 
-            return $product;
+            // 3. التعامل مع المنتج المتغير (هنا يكمن السحر)
+            if ($data['product_type'] === 'variable' && isset($data['options'])) {
+                
+                $createdOptionsValues = []; // لتخزين قيم الخيارات التي تم إنشاؤها
+
+                // --- إنشاء الخيارات والقيم الخاصة بها ---
+                foreach ($data['options'] as $optionData) {
+                    $option = $product->options()->create(['name' => $optionData['name']]);
+                    
+                    foreach ($optionData['values'] as $value) {
+                        $createdValue = $option->values()->create(['value' => $value]);
+                        // تخزين القيمة مع اسمها لتسهيل العثور عليها لاحقًا
+                        $createdOptionsValues[strtolower($value)] = $createdValue->id;
+                    }
+                }
+
+                // --- إنشاء المتغيرات وربطها بالقيم ---
+                if (isset($data['variants'])) {
+                    foreach ($data['variants'] as $variantData) {
+                        $variant = $product->variants()->create([
+                            'price' => $variantData['price'],
+                            'sku' => $variantData['sku'] ?? null,
+                            'stock' => $variantData['stock'],
+                        ]);
+
+                        // ربط المتغير بالقيم الصحيحة (مثلاً: أحمر + XL)
+                        $valueIds = [];
+                        foreach ($variantData['options'] as $optionValue) {
+                            if (isset($createdOptionsValues[strtolower($optionValue)])) {
+                                $valueIds[] = $createdOptionsValues[strtolower($optionValue)];
+                            }
+                        }
+                        
+                        if (!empty($valueIds)) {
+                            $variant->optionValues()->sync($valueIds);
+                        }
+                    }
+                }
+            }
+            
+            // إرجاع المنتج مع كل العلاقات الجديدة
+            return $product->load('images', 'options.values', 'variants.optionValues');
         });
     }
 
     /**
-     * Update an existing product.
+     * تحديث منتج حالي. (سنعمل على هذه الدالة لاحقًا)
      *
-     * @param Product $product The product to update.
-     * @param array $data The validated data from the request.
+     * @param Product $product
+     * @param array $data
      * @return Product
      */
     public function updateProduct(Product $product, array $data): Product
     {
-        return DB::transaction(function () use ($product, $data) {
-            $product->update($data);
-
-            // TODO: Add logic to update images, options, and variants later.
-            
-            return $product;
-        });
-    }
-
-    /**
-     * Handle the uploading and association of images to a product.
-     */
-    private function handleImageUploads(Product $product, array $images): void
-    {
-        foreach ($images as $imageFile) {
-            $path = $imageFile->store('products', 'public');
-            $product->images()->create(['image_url' => $path]);
-        }
-    }
-
-    /**
-     * Create options, values, and variants for a variable product.
-     */
-    private function createOptionsAndVariants(Product $product, array $optionsData, array $variantsData): void
-    {
-        foreach ($optionsData as $optionInput) {
-            $option = $product->options()->create(['name' => $optionInput['name']]);
-            foreach ($optionInput['values'] as $valueInput) {
-                $option->values()->create(['value' => $valueInput['value']]);
-            }
-        }
-
-        $valueMap = $product->fresh()->load('options.values')
-            ->options
-            ->flatMap(fn($opt) => $opt->values)
-            ->pluck('id', 'value');
-
-        foreach ($variantsData as $variantInput) {
-            $variant = $product->variants()->create([
-                'price' => $variantInput['price'],
-                'sku' => $variantInput['sku'],
-                'stock' => $variantInput['stock'],
-            ]);
-
-            $valueIds = collect($variantInput['combination'])
-                ->map(fn($val) => $valueMap[$val] ?? null)
-                ->filter();
-
-            if ($valueIds->isNotEmpty()) {
-                $variant->optionValues()->attach($valueIds);
-            }
-        }
+        // ... سيتم إضافة منطق التحديث هنا في الخطوات القادمة
+        $product->update($data);
+        return $product;
     }
 }

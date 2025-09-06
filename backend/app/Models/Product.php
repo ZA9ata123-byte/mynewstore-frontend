@@ -15,9 +15,13 @@ class Product extends Model
         'price', 'product_type', 'stock',
     ];
 
-    // --- هنا تمت إضافة الذكاء ---
     protected $appends = ['total_stock', 'price_range'];
 
+    /**
+     * --- هنا الإصلاح الأول ---
+     * تم حذف الأقواس من variants() لتصبح variants
+     * هذا يجعلها تستخدم المتغيرات التي تم تحميلها مسبقاً
+     */
     protected function totalStock(): Attribute
     {
         return Attribute::make(
@@ -25,26 +29,32 @@ class Product extends Model
                 if ($this->product_type === 'simple') {
                     return $this->stock;
                 }
-                return $this->variants()->sum('stock');
+                // استخدمنا العلاقة المحملة مسبقًا لتجنب استعلام إضافي
+                return $this->relationLoaded('variants') ? $this->variants->sum('stock') : 0;
             }
         );
     }
 
     /**
-     * --- هادي هي الدالة السحرية الجديدة لي كتحسب لينا مجال السعر ---
+     * --- هنا الإصلاح الثاني ---
+     * نفس الشيء، حذفنا الأقواس () من variants
      */
     protected function priceRange(): Attribute
     {
         return Attribute::make(
             get: function () {
-                // إذا كان المنتج بسيط، رجع السعر العادي
                 if ($this->product_type === 'simple') {
                     return "{$this->price} د.م.";
                 }
 
-                // إذا كان المنتج متغير، احسب أصغر وأكبر سعر
-                $minPrice = $this->variants()->min('price');
-                $maxPrice = $this->variants()->max('price');
+                // تأكد من أن المتغيرات قد تم تحميلها لتجنب الأخطاء
+                if (!$this->relationLoaded('variants') || $this->variants->isEmpty()) {
+                    return 'N/A'; // أو أي قيمة افتراضية
+                }
+                
+                // استخدمنا العلاقة المحملة مسبقًا
+                $minPrice = $this->variants->min('price');
+                $maxPrice = $this->variants->max('price');
 
                 if ($minPrice && $maxPrice) {
                     if ($minPrice == $maxPrice) {
@@ -52,27 +62,22 @@ class Product extends Model
                     }
                     return "{$minPrice} - {$maxPrice} د.م.";
                 }
-
-                // في حالة عدم وجود متغيرات، رجع السعر الأساسي
+                
                 return "{$this->price} د.م.";
             }
         );
     }
 
-    // --- العلاقات ---
+    // --- العلاقات (تبقى كما هي) ---
     public function category() { return $this->belongsTo(Category::class); }
     public function images() { return $this->hasMany(ProductImage::class); }
     public function options() { return $this->hasMany(ProductOption::class); }
     public function variants() { return $this->hasMany(ProductVariant::class); }
 
-    /**
-     * --- هادي هي الدالة الجديدة اللي زدنا ---
-     * Check if the product is of variable type.
-     *
-     * @return bool
-     */
     public function isVariable(): bool
     {
         return $this->product_type === 'variable';
     }
 }
+
+    

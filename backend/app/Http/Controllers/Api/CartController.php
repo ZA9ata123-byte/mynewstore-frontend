@@ -69,3 +69,4 @@ class CartController extends Controller
         return response()->json($updatedCart);
     }
 }
+// ✅ استيراد المودل

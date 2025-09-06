@@ -2,46 +2,52 @@
 
 namespace App\Services;
 
+// ✅ استدعاء المودل ديال المستخدم، ضروري
 use App\Models\User;
-use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
 
 class AuthService
 {
     /**
+     * ✅✅✅ هادي هي الميثود لي كانت ناقصة ✅✅✅
      * Register a new user.
      *
      * @param array $data
-     * @return User
+     * @return \App\Models\User
      */
-    public function registerUser(array $data): User
+    public function registerUser(array $data)
     {
-        $user = User::create([
+        // كنصايبو مستخدم جديد وكنقومو بتشفير كلمة السر
+        return User::create([
             'name' => $data['name'],
             'email' => $data['email'],
-            'password' => Hash::make($data['password']),
+            'password' => bcrypt($data['password']),
         ]);
-
-        return $user;
     }
 
     /**
      * Attempt to log the user in.
      *
      * @param array $credentials
-     * @return string The auth token.
+     * @return string The new API token.
      * @throws ValidationException
      */
     public function loginUser(array $credentials): string
     {
-        $user = User::where('email', $credentials['email'])->first();
-
-        if (! $user || ! Hash::check($credentials['password'], $user->password)) {
+        if (!Auth::attempt($credentials)) {
             throw ValidationException::withMessages([
                 'email' => ['The provided credentials do not match our records.'],
             ]);
         }
 
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+
+        // كنحيدو أي توكن قديم عندو باش منخليوش توكنات بزاف
+        $user->tokens()->delete();
+
+        // كنصايبو ليه توكن جديد
         return $user->createToken('auth_token')->plainTextToken;
     }
 }
